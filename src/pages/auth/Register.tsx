@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Mail, Lock, ArrowRight, User, Phone, Globe, CheckCircle } from 'lucide-react';
+import { Mail, Lock, ArrowRight, User, Phone, Globe, CheckCircle, AlertCircle } from 'lucide-react';
 import { motion } from 'motion/react';
+import { useAuth } from '../../context/AuthContext';
 
 export default function Register() {
   const [formData, setFormData] = useState({
@@ -14,7 +15,9 @@ export default function Register() {
     agreeToTerms: false
   });
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -26,7 +29,7 @@ export default function Register() {
     }));
   };
 
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -40,11 +43,33 @@ export default function Register() {
       return;
     }
 
-    // Simulate registration
-    localStorage.setItem('isAuthenticated', 'true');
-    localStorage.setItem('userEmail', formData.email);
-    localStorage.setItem('userName', formData.fullName);
-    navigate('/dashboard');
+    setIsLoading(true);
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullName: formData.fullName,
+          email: formData.email,
+          phone: formData.phone,
+          country: formData.country,
+          password: formData.password
+        })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Registration failed');
+      }
+
+      login(data.user);
+      navigate('/dashboard');
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -70,7 +95,7 @@ export default function Register() {
 
         {error && (
           <div className="mb-6 p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-2 text-red-400 text-sm">
-            <CheckCircle className="w-4 h-4 text-red-400" />
+            <AlertCircle className="w-4 h-4 text-red-400" />
             {error}
           </div>
         )}
@@ -203,9 +228,10 @@ export default function Register() {
           <div className="md:col-span-2">
             <button 
               type="submit" 
-              className="w-full py-4 bg-nexus-gold text-nexus-dark font-bold rounded-lg hover:bg-white transition-colors flex items-center justify-center gap-2 mt-2"
+              disabled={isLoading}
+              className="w-full py-4 bg-nexus-gold text-nexus-dark font-bold rounded-lg hover:bg-white transition-colors flex items-center justify-center gap-2 mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Create Investor Account <ArrowRight className="w-4 h-4" />
+              {isLoading ? 'Creating Account...' : 'Create Investor Account'} <ArrowRight className="w-4 h-4" />
             </button>
           </div>
         </form>

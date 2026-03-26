@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   TrendingUp, 
   ArrowUpRight, 
@@ -21,6 +21,8 @@ import {
   Cell
 } from 'recharts';
 import { motion } from 'motion/react';
+import { useAuth } from '../../context/AuthContext';
+import { Link } from 'react-router-dom';
 
 const data = [
   { name: 'Jan', value: 4000 },
@@ -65,20 +67,46 @@ const Widget = ({ title, value, change, icon: Icon, color }: any) => (
 );
 
 export default function Overview() {
+  const { user } = useAuth();
+  const [dashboardData, setDashboardData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        const res = await fetch('/api/user/dashboard');
+        if (res.ok) {
+          const data = await res.json();
+          setDashboardData(data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch dashboard data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, []);
+
+  if (loading) {
+    return <div className="text-white">Loading dashboard...</div>;
+  }
+
   return (
     <div className="space-y-8">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-white mb-2">Dashboard Overview</h1>
-          <p className="text-blue-200">Welcome back, here's what's happening with your portfolio.</p>
+          <p className="text-blue-200">Welcome back {user?.fullName}, here's what's happening with your portfolio.</p>
         </div>
         <div className="flex gap-3">
-          <button className="px-4 py-2 bg-nexus-blue text-white rounded-lg hover:bg-nexus-blue/80 transition-colors flex items-center gap-2">
+          <Link to="/dashboard/deposit" className="px-4 py-2 bg-nexus-blue text-white rounded-lg hover:bg-nexus-blue/80 transition-colors flex items-center gap-2">
             <ArrowDownLeft className="w-4 h-4" /> Deposit
-          </button>
-          <button className="px-4 py-2 bg-nexus-navy border border-white/10 text-white rounded-lg hover:bg-white/5 transition-colors flex items-center gap-2">
+          </Link>
+          <Link to="/dashboard/withdraw" className="px-4 py-2 bg-nexus-navy border border-white/10 text-white rounded-lg hover:bg-white/5 transition-colors flex items-center gap-2">
             <ArrowUpRight className="w-4 h-4" /> Withdraw
-          </button>
+          </Link>
         </div>
       </div>
 
@@ -86,29 +114,29 @@ export default function Overview() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Widget 
           title="Total Balance" 
-          value="$124,592.00" 
-          change="+12.5%" 
+          value={`$${dashboardData?.balance?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`} 
+          change="+0.0%" 
           icon={Wallet} 
           color="text-nexus-gold" 
         />
         <Widget 
           title="Total Profit" 
-          value="$34,200.50" 
-          change="+8.2%" 
+          value="$0.00" 
+          change="+0.0%" 
           icon={TrendingUp} 
           color="text-emerald-400" 
         />
         <Widget 
-          title="Active Investments" 
-          value="12" 
-          change="+2" 
+          title="Total Withdrawals" 
+          value={`$${dashboardData?.totalWithdrawals?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`} 
+          change="+0" 
           icon={Activity} 
           color="text-nexus-blue" 
         />
         <Widget 
           title="Total Deposits" 
-          value="$85,000.00" 
-          change="+5.0%" 
+          value={`$${dashboardData?.totalDeposits?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`} 
+          change="+0.0%" 
           icon={DollarSign} 
           color="text-purple-400" 
         />
@@ -203,7 +231,7 @@ export default function Overview() {
       >
         <div className="flex justify-between items-center mb-6">
           <h3 className="text-xl font-bold text-white">Recent Transactions</h3>
-          <button className="text-nexus-gold text-sm hover:underline">View All</button>
+          <Link to="/dashboard/transactions" className="text-nexus-gold text-sm hover:underline">View All</Link>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -217,28 +245,31 @@ export default function Overview() {
               </tr>
             </thead>
             <tbody className="text-sm">
-              {[
-                { id: 'TRX-98234', type: 'Deposit', date: 'Oct 24, 2025', amount: '+$5,000.00', status: 'Completed' },
-                { id: 'TRX-98233', type: 'Investment', date: 'Oct 22, 2025', amount: '-$2,500.00', status: 'Active' },
-                { id: 'TRX-98232', type: 'Profit', date: 'Oct 20, 2025', amount: '+$124.50', status: 'Completed' },
-                { id: 'TRX-98231', type: 'Withdrawal', date: 'Oct 18, 2025', amount: '-$1,000.00', status: 'Pending' },
-              ].map((tx, i) => (
-                <tr key={i} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                  <td className="py-4 text-slate-300 font-mono">{tx.id}</td>
-                  <td className="py-4 text-white">{tx.type}</td>
-                  <td className="py-4 text-slate-400">{tx.date}</td>
-                  <td className={`py-4 font-bold ${tx.amount.startsWith('+') ? 'text-emerald-400' : 'text-white'}`}>{tx.amount}</td>
-                  <td className="py-4">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      tx.status === 'Completed' ? 'bg-emerald-500/10 text-emerald-400' : 
-                      tx.status === 'Pending' ? 'bg-yellow-500/10 text-yellow-400' : 
-                      'bg-blue-500/10 text-blue-400'
-                    }`}>
-                      {tx.status}
-                    </span>
-                  </td>
+              {dashboardData?.recentTransactions?.length > 0 ? (
+                dashboardData.recentTransactions.map((tx: any, i: number) => (
+                  <tr key={i} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                    <td className="py-4 text-slate-300 font-mono">{tx.id}</td>
+                    <td className="py-4 text-white capitalize">{tx.type}</td>
+                    <td className="py-4 text-slate-400">{new Date(tx.createdAt).toLocaleDateString()}</td>
+                    <td className={`py-4 font-bold ${tx.type === 'deposit' ? 'text-emerald-400' : 'text-white'}`}>
+                      {tx.type === 'deposit' ? '+' : '-'}${tx.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td className="py-4">
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        tx.status === 'Completed' ? 'bg-emerald-500/10 text-emerald-400' : 
+                        tx.status === 'Pending' ? 'bg-yellow-500/10 text-yellow-400' : 
+                        'bg-red-500/10 text-red-400'
+                      }`}>
+                        {tx.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={5} className="py-8 text-center text-slate-400">No recent transactions found.</td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>

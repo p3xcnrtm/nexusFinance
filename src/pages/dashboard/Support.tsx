@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { MessageSquare, Send, HelpCircle, FileText, ChevronDown, ChevronUp, Plus, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import { MessageSquare, Send, HelpCircle, FileText, ChevronDown, ChevronUp, Plus, Clock, CheckCircle, AlertCircle, User } from 'lucide-react';
 
 const FAQItem = ({ question, answer }: any) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -29,27 +29,95 @@ const FAQItem = ({ question, answer }: any) => {
 
 export default function Support() {
   const [activeTab, setActiveTab] = useState('faq');
-  const [tickets, setTickets] = useState([
-    { id: 'TKT-9921', subject: 'Deposit Issue', status: 'Open', lastUpdate: '2 mins ago', priority: 'High' },
-    { id: 'TKT-9844', subject: 'KYC Verification', status: 'Resolved', lastUpdate: '2 days ago', priority: 'Medium' },
-  ]);
+  const [tickets, setTickets] = useState<any[]>([]);
   const [isNewTicketOpen, setIsNewTicketOpen] = useState(false);
   const [newTicketSubject, setNewTicketSubject] = useState('');
   const [newTicketMessage, setNewTicketMessage] = useState('');
+  const [selectedTicket, setSelectedTicket] = useState<any>(null);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [reply, setReply] = useState('');
+  const [error, setError] = useState('');
 
-  const handleCreateTicket = (e: React.FormEvent) => {
+  useEffect(() => {
+    if (activeTab === 'tickets') {
+      fetchTickets();
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (selectedTicket) {
+      fetchMessages(selectedTicket.id);
+    }
+  }, [selectedTicket]);
+
+  const fetchTickets = async () => {
+    try {
+      const res = await fetch('/api/user/tickets');
+      if (res.ok) {
+        const data = await res.json();
+        setTickets(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch tickets:', err);
+    }
+  };
+
+  const fetchMessages = async (ticketId: string) => {
+    try {
+      const res = await fetch(`/api/user/tickets/${ticketId}/messages`);
+      if (res.ok) {
+        const data = await res.json();
+        setMessages(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch messages:', err);
+    }
+  };
+
+  const handleCreateTicket = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newTicket = {
-      id: `TKT-${Math.floor(Math.random() * 10000)}`,
-      subject: newTicketSubject,
-      status: 'Open',
-      lastUpdate: 'Just now',
-      priority: 'Medium'
-    };
-    setTickets([newTicket, ...tickets]);
-    setIsNewTicketOpen(false);
-    setNewTicketSubject('');
-    setNewTicketMessage('');
+    setError('');
+    
+    try {
+      const res = await fetch('/api/user/tickets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subject: newTicketSubject, message: newTicketMessage })
+      });
+
+      if (res.ok) {
+        setIsNewTicketOpen(false);
+        setNewTicketSubject('');
+        setNewTicketMessage('');
+        fetchTickets();
+      } else {
+        const errData = await res.json();
+        setError(errData.error || 'Failed to create ticket');
+      }
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
+  const handleReply = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reply.trim() || !selectedTicket) return;
+
+    try {
+      const res = await fetch(`/api/user/tickets/${selectedTicket.id}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: reply })
+      });
+
+      if (res.ok) {
+        setReply('');
+        fetchMessages(selectedTicket.id);
+        fetchTickets(); // Refresh ticket list to update status if needed
+      }
+    } catch (err) {
+      console.error('Failed to send reply:', err);
+    }
   };
 
   return (
@@ -61,7 +129,7 @@ export default function Support() {
         </div>
         <div className="flex bg-nexus-navy border border-white/10 rounded-lg p-1">
           <button 
-            onClick={() => setActiveTab('faq')}
+            onClick={() => { setActiveTab('faq'); setSelectedTicket(null); setIsNewTicketOpen(false); }}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'faq' ? 'bg-nexus-gold text-nexus-dark shadow-lg' : 'text-slate-400 hover:text-white'}`}
           >
             FAQ & Docs
@@ -74,6 +142,12 @@ export default function Support() {
           </button>
         </div>
       </div>
+
+      {error && (
+        <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400">
+          {error}
+        </div>
+      )}
 
       {activeTab === 'faq' && (
         <motion.div 
@@ -131,7 +205,7 @@ export default function Support() {
             <h3 className="text-xl font-bold text-white mb-4">Need more help?</h3>
             <p className="text-sm text-blue-200 mb-6">Our support team is available 24/7 to assist you with any issues.</p>
             <button 
-              onClick={() => setActiveTab('tickets')}
+              onClick={() => { setActiveTab('tickets'); setIsNewTicketOpen(true); }}
               className="w-full py-3 bg-nexus-gold text-nexus-dark font-bold rounded-lg hover:bg-white transition-colors flex items-center justify-center gap-2"
             >
               <MessageSquare className="w-4 h-4" /> Open Support Ticket
@@ -151,17 +225,20 @@ export default function Support() {
             <div className="p-4 border-b border-white/10 bg-nexus-dark/50 flex justify-between items-center">
               <h2 className="text-lg font-bold text-white">My Tickets</h2>
               <button 
-                onClick={() => setIsNewTicketOpen(true)}
+                onClick={() => { setIsNewTicketOpen(true); setSelectedTicket(null); }}
                 className="p-2 bg-nexus-gold/10 text-nexus-gold rounded-lg hover:bg-nexus-gold/20 transition-colors"
               >
                 <Plus className="w-5 h-5" />
               </button>
             </div>
             <div className="flex-1 overflow-y-auto">
-              {tickets.map((ticket) => (
+              {tickets.length === 0 ? (
+                <div className="p-4 text-center text-slate-500 text-sm">No tickets found.</div>
+              ) : tickets.map((ticket) => (
                 <div 
                   key={ticket.id}
-                  className="p-4 border-b border-white/5 cursor-pointer transition-colors hover:bg-white/5 group"
+                  onClick={() => { setSelectedTicket(ticket); setIsNewTicketOpen(false); }}
+                  className={`p-4 border-b border-white/5 cursor-pointer transition-colors hover:bg-white/5 group ${selectedTicket?.id === ticket.id ? 'bg-white/10 border-l-4 border-l-nexus-gold' : ''}`}
                 >
                   <div className="flex justify-between items-start mb-1">
                     <h4 className="font-bold text-white text-sm truncate group-hover:text-nexus-gold transition-colors">{ticket.subject}</h4>
@@ -173,7 +250,7 @@ export default function Support() {
                   </div>
                   <div className="flex justify-between items-center text-[10px] text-slate-500 mt-2">
                     <span>{ticket.id}</span>
-                    <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {ticket.lastUpdate}</span>
+                    <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {new Date(ticket.createdAt).toLocaleDateString()}</span>
                   </div>
                 </div>
               ))}
@@ -225,6 +302,66 @@ export default function Support() {
                   </div>
                 </form>
               </div>
+            ) : selectedTicket ? (
+              <>
+                <div className="p-6 border-b border-white/10 bg-nexus-dark/50 flex justify-between items-center">
+                  <div>
+                    <h2 className="text-xl font-bold text-white mb-1">{selectedTicket.subject}</h2>
+                    <div className="flex items-center gap-2 text-xs text-slate-400">
+                      <span className="bg-white/10 px-2 py-0.5 rounded text-white">{selectedTicket.id}</span>
+                      <span>•</span>
+                      <span>{new Date(selectedTicket.createdAt).toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex-1 p-6 overflow-y-auto space-y-6">
+                  {messages.map((msg: any) => (
+                    <div key={msg.id} className={`flex gap-4 ${msg.senderRole === 'admin' ? 'flex-row-reverse' : ''}`}>
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${msg.senderRole === 'admin' ? 'bg-red-600' : 'bg-slate-700'}`}>
+                        {msg.senderRole === 'admin' ? <span className="text-white font-bold text-xs">A</span> : <User className="w-4 h-4 text-slate-300" />}
+                      </div>
+                      <div className={`border p-4 rounded-lg max-w-lg ${
+                        msg.senderRole === 'admin' 
+                          ? 'bg-red-500/10 border-red-500/20 rounded-tr-none' 
+                          : 'bg-nexus-dark border-white/10 rounded-tl-none'
+                      }`}>
+                        <p className={`text-sm leading-relaxed ${msg.senderRole === 'admin' ? 'text-white' : 'text-slate-300'}`}>
+                          {msg.message}
+                        </p>
+                        <p className={`text-[10px] mt-2 ${msg.senderRole === 'admin' ? 'text-red-300/50 text-right' : 'text-slate-500 text-right'}`}>
+                          {new Date(msg.createdAt).toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {selectedTicket.status !== 'Resolved' && (
+                  <div className="p-4 bg-nexus-dark/50 border-t border-white/10">
+                    <form onSubmit={handleReply} className="relative">
+                      <input 
+                        type="text" 
+                        value={reply}
+                        onChange={(e) => setReply(e.target.value)}
+                        placeholder="Type your reply..." 
+                        className="w-full bg-nexus-navy border border-white/10 rounded-lg pl-4 pr-12 py-3 text-white focus:border-nexus-gold outline-none transition-colors"
+                      />
+                      <button 
+                        type="submit" 
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-nexus-gold text-nexus-dark rounded-md hover:bg-white transition-colors"
+                      >
+                        <Send className="w-4 h-4" />
+                      </button>
+                    </form>
+                  </div>
+                )}
+                {selectedTicket.status === 'Resolved' && (
+                  <div className="p-4 bg-emerald-500/10 border-t border-emerald-500/20 text-center text-emerald-400 text-sm">
+                    This ticket has been resolved and closed.
+                  </div>
+                )}
+              </>
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center text-slate-500 p-8 text-center">
                 <MessageSquare className="w-16 h-16 mb-4 opacity-20" />

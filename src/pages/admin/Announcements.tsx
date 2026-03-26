@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Send, Bell, CheckCircle } from 'lucide-react';
 
@@ -7,14 +7,50 @@ export default function Announcements() {
   const [message, setMessage] = useState('');
   const [target, setTarget] = useState('all');
   const [isSent, setIsSent] = useState(false);
+  const [announcements, setAnnouncements] = useState<any[]>([]);
+  const [error, setError] = useState('');
 
-  const handleSend = (e: React.FormEvent) => {
+  useEffect(() => {
+    fetchAnnouncements();
+  }, []);
+
+  const fetchAnnouncements = async () => {
+    try {
+      const res = await fetch('/api/admin/announcements');
+      if (res.ok) {
+        const data = await res.json();
+        setAnnouncements(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch announcements:', err);
+    }
+  };
+
+  const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Simulate sending announcement
-    setIsSent(true);
-    setTimeout(() => setIsSent(false), 3000);
-    setTitle('');
-    setMessage('');
+    setError('');
+    
+    try {
+      const res = await fetch('/api/admin/announcements', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, message, target })
+      });
+
+      if (res.ok) {
+        setIsSent(true);
+        setTimeout(() => setIsSent(false), 3000);
+        setTitle('');
+        setMessage('');
+        setTarget('all');
+        fetchAnnouncements();
+      } else {
+        const errData = await res.json();
+        setError(errData.error || 'Failed to send announcement');
+      }
+    } catch (err: any) {
+      setError(err.message);
+    }
   };
 
   return (
@@ -23,6 +59,12 @@ export default function Announcements() {
         <h1 className="text-3xl font-bold text-white mb-2">System Announcements</h1>
         <p className="text-slate-400">Broadcast messages to all users or specific groups.</p>
       </div>
+
+      {error && (
+        <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400">
+          {error}
+        </div>
+      )}
 
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
@@ -95,15 +137,13 @@ export default function Announcements() {
           <Bell className="w-5 h-5 text-slate-400" /> Recent History
         </h3>
         <div className="space-y-4">
-          {[
-            { title: 'Platform Maintenance', date: 'Oct 20, 2025', audience: 'All Users', status: 'Sent' },
-            { title: 'New Investment Plan Launch', date: 'Oct 15, 2025', audience: 'VIP Members', status: 'Sent' },
-            { title: 'Security Update', date: 'Oct 10, 2025', audience: 'All Users', status: 'Sent' },
-          ].map((item, i) => (
+          {announcements.length === 0 ? (
+            <p className="text-slate-400 text-sm">No announcements sent yet.</p>
+          ) : announcements.map((item, i) => (
             <div key={i} className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/5 hover:bg-white/10 transition-colors">
               <div>
                 <p className="text-white font-medium">{item.title}</p>
-                <p className="text-xs text-slate-400">Sent to: {item.audience} • {item.date}</p>
+                <p className="text-xs text-slate-400">Sent to: {item.target === 'all' ? 'All Users' : item.target} • {new Date(item.createdAt).toLocaleString()}</p>
               </div>
               <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded uppercase tracking-wider">{item.status}</span>
             </div>

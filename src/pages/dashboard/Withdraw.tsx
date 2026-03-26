@@ -1,11 +1,79 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { ArrowUpRight, AlertCircle, CheckCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 export default function Withdraw() {
   const [amount, setAmount] = useState('');
   const [address, setAddress] = useState('');
   const [selectedAsset, setSelectedAsset] = useState('BTC');
+  const [balance, setBalance] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchBalance = async () => {
+      try {
+        const res = await fetch('/api/user/dashboard');
+        if (res.ok) {
+          const data = await res.json();
+          setBalance(data.balance);
+        }
+      } catch (error) {
+        console.error('Failed to fetch balance:', error);
+      }
+    };
+    fetchBalance();
+  }, []);
+
+  const handleWithdraw = async () => {
+    setError('');
+    setSuccess('');
+
+    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
+      setError('Please enter a valid amount.');
+      return;
+    }
+
+    if (!address) {
+      setError('Please enter a valid wallet address.');
+      return;
+    }
+
+    if (Number(amount) > balance) {
+      setError('Insufficient balance.');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const res = await fetch('/api/user/withdraw', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: Number(amount), asset: selectedAsset, address })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Withdrawal request failed');
+      }
+
+      setSuccess(`Withdrawal request submitted successfully! Transaction ID: ${data.txId}`);
+      setAmount('');
+      setAddress('');
+      setBalance(prev => prev - Number(amount));
+      setTimeout(() => {
+        navigate('/dashboard/transactions');
+      }, 3000);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="max-w-2xl mx-auto space-y-8">
@@ -13,6 +81,20 @@ export default function Withdraw() {
         <h1 className="text-3xl font-bold text-white mb-2">Withdraw Funds</h1>
         <p className="text-blue-200">Request a withdrawal to your external wallet.</p>
       </div>
+
+      {error && (
+        <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-3 text-red-400">
+          <AlertCircle className="w-5 h-5 shrink-0" />
+          <p>{error}</p>
+        </div>
+      )}
+
+      {success && (
+        <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-lg flex items-center gap-3 text-emerald-400">
+          <CheckCircle className="w-5 h-5 shrink-0" />
+          <p>{success}</p>
+        </div>
+      )}
 
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
@@ -23,7 +105,7 @@ export default function Withdraw() {
           <h3 className="text-xl font-bold text-white">Withdrawal Details</h3>
           <div className="text-right">
             <p className="text-xs text-slate-400 uppercase tracking-wider">Available Balance</p>
-            <p className="text-nexus-gold font-bold text-lg">$124,592.00</p>
+            <p className="text-nexus-gold font-bold text-lg">${balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
           </div>
         </div>
 
@@ -73,8 +155,12 @@ export default function Withdraw() {
           </p>
         </div>
 
-        <button className="w-full py-4 bg-nexus-gold text-nexus-dark font-bold rounded-lg hover:bg-white transition-colors flex items-center justify-center gap-2">
-          Request Withdrawal <ArrowUpRight className="w-4 h-4" />
+        <button 
+          onClick={handleWithdraw}
+          disabled={isLoading}
+          className="w-full py-4 bg-nexus-gold text-nexus-dark font-bold rounded-lg hover:bg-white transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isLoading ? 'Processing...' : 'Request Withdrawal'} <ArrowUpRight className="w-4 h-4" />
         </button>
       </motion.div>
     </div>

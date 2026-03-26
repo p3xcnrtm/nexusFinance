@@ -2,23 +2,44 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ShieldCheck, Lock, AlertCircle, ArrowRight } from 'lucide-react';
 import { motion } from 'motion/react';
+import { useAuth } from '../../context/AuthContext';
 
 export default function AdminLogin() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const { login } = useAuth();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setIsLoading(true);
     
-    // Simulate admin login
-    if (email === 'admin@nexusedge.finance' && password === 'admin123') {
-      localStorage.setItem('isAdminAuthenticated', 'true');
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Login failed');
+      }
+
+      if (data.user.role !== 'admin') {
+        throw new Error('Access denied. Admin privileges required.');
+      }
+
+      login(data.user);
       navigate('/admin/dashboard');
-    } else {
-      setError('Invalid admin credentials.');
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -59,6 +80,7 @@ export default function AdminLogin() {
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full bg-nexus-dark/50 border border-white/10 rounded-lg pl-10 pr-4 py-3 text-white focus:border-red-500 outline-none transition-colors"
                 placeholder="admin@nexusedge.finance"
+                required
               />
             </div>
           </div>
@@ -73,15 +95,17 @@ export default function AdminLogin() {
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full bg-nexus-dark/50 border border-white/10 rounded-lg pl-10 pr-4 py-3 text-white focus:border-red-500 outline-none transition-colors"
                 placeholder="••••••••"
+                required
               />
             </div>
           </div>
 
           <button 
             type="submit" 
-            className="w-full py-4 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2 mt-6 shadow-lg shadow-red-900/20"
+            disabled={isLoading}
+            className="w-full py-4 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2 mt-6 shadow-lg shadow-red-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Authenticate <ArrowRight className="w-4 h-4" />
+            {isLoading ? 'Authenticating...' : 'Authenticate'} <ArrowRight className="w-4 h-4" />
           </button>
         </form>
         

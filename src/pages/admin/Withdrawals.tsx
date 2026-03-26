@@ -1,27 +1,66 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { ArrowUpRight, CheckCircle, XCircle, MoreVertical } from 'lucide-react';
 
 export default function Withdrawals() {
-  const [withdrawals, setWithdrawals] = useState([
-    { id: 'WDR-98234', user: 'John Doe', amount: '$2,500.00', asset: 'BTC', date: 'Oct 24, 2025', status: 'Pending' },
-    { id: 'WDR-98233', user: 'Sarah Smith', amount: '$500.00', asset: 'USDT', date: 'Oct 22, 2025', status: 'Approved' },
-    { id: 'WDR-98232', user: 'Mike Johnson', amount: '$1,000.00', asset: 'ETH', date: 'Oct 20, 2025', status: 'Rejected' },
-    { id: 'WDR-98231', user: 'Emily Davis', amount: '$3,000.00', asset: 'SOL', date: 'Oct 18, 2025', status: 'Pending' },
-  ]);
+  const [withdrawals, setWithdrawals] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  const handleApprove = (id: string) => {
-    const updatedWithdrawals = withdrawals.map(w => 
-      w.id === id ? { ...w, status: 'Approved' } : w
-    );
-    setWithdrawals(updatedWithdrawals);
+  useEffect(() => {
+    fetchWithdrawals();
+  }, []);
+
+  const fetchWithdrawals = async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch('/api/admin/transactions');
+      if (res.ok) {
+        const data = await res.json();
+        setWithdrawals(data.filter((t: any) => t.type === 'withdrawal'));
+      } else {
+        const errData = await res.json();
+        setError(errData.error || 'Failed to fetch withdrawals');
+      }
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleReject = (id: string) => {
-    const updatedWithdrawals = withdrawals.map(w => 
-      w.id === id ? { ...w, status: 'Rejected' } : w
-    );
-    setWithdrawals(updatedWithdrawals);
+  const handleApprove = async (id: number) => {
+    try {
+      const res = await fetch(`/api/admin/transactions/${id}/approve`, { method: 'POST' });
+      if (res.ok) {
+        const updatedWithdrawals = withdrawals.map(w => 
+          w.id === id ? { ...w, status: 'Completed' } : w
+        );
+        setWithdrawals(updatedWithdrawals);
+      } else {
+        const errData = await res.json();
+        alert(errData.error || 'Failed to approve withdrawal');
+      }
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  const handleReject = async (id: number) => {
+    try {
+      const res = await fetch(`/api/admin/transactions/${id}/reject`, { method: 'POST' });
+      if (res.ok) {
+        const updatedWithdrawals = withdrawals.map(w => 
+          w.id === id ? { ...w, status: 'Rejected' } : w
+        );
+        setWithdrawals(updatedWithdrawals);
+      } else {
+        const errData = await res.json();
+        alert(errData.error || 'Failed to reject withdrawal');
+      }
+    } catch (err: any) {
+      alert(err.message);
+    }
   };
 
   return (
@@ -34,6 +73,12 @@ export default function Withdrawals() {
           </button>
         </div>
       </div>
+
+      {error && (
+        <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400">
+          {error}
+        </div>
+      )}
 
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
@@ -53,16 +98,27 @@ export default function Withdrawals() {
             </tr>
           </thead>
           <tbody className="text-sm divide-y divide-white/5">
-            {withdrawals.map((withdrawal) => (
+            {isLoading ? (
+              <tr>
+                <td colSpan={7} className="px-6 py-8 text-center text-slate-400">Loading withdrawals...</td>
+              </tr>
+            ) : withdrawals.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="px-6 py-8 text-center text-slate-400">No withdrawal requests found.</td>
+              </tr>
+            ) : withdrawals.map((withdrawal) => (
               <tr key={withdrawal.id} className="hover:bg-white/5 transition-colors group">
                 <td className="px-6 py-4 font-mono text-slate-300">{withdrawal.id}</td>
-                <td className="px-6 py-4 font-medium text-white">{withdrawal.user}</td>
-                <td className="px-6 py-4 font-bold text-red-400">{withdrawal.amount}</td>
+                <td className="px-6 py-4 font-medium text-white">
+                  <div>{withdrawal.userName}</div>
+                  <div className="text-xs text-slate-500">{withdrawal.userEmail}</div>
+                </td>
+                <td className="px-6 py-4 font-bold text-red-400">${withdrawal.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                 <td className="px-6 py-4 text-slate-400">{withdrawal.asset}</td>
-                <td className="px-6 py-4 text-slate-400">{withdrawal.date}</td>
+                <td className="px-6 py-4 text-slate-400">{new Date(withdrawal.createdAt).toLocaleDateString()}</td>
                 <td className="px-6 py-4">
                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    withdrawal.status === 'Approved' ? 'bg-emerald-500/10 text-emerald-400' : 
+                    withdrawal.status === 'Completed' ? 'bg-emerald-500/10 text-emerald-400' : 
                     withdrawal.status === 'Pending' ? 'bg-yellow-500/10 text-yellow-400' : 
                     'bg-red-500/10 text-red-400'
                   }`}>

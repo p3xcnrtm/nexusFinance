@@ -1,27 +1,66 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { ArrowDownLeft, CheckCircle, XCircle, MoreVertical } from 'lucide-react';
 
 export default function Deposits() {
-  const [deposits, setDeposits] = useState([
-    { id: 'DEP-98234', user: 'John Doe', amount: '$5,000.00', asset: 'BTC', date: 'Oct 24, 2025', status: 'Pending' },
-    { id: 'DEP-98233', user: 'Sarah Smith', amount: '$1,200.00', asset: 'USDT', date: 'Oct 22, 2025', status: 'Approved' },
-    { id: 'DEP-98232', user: 'Mike Johnson', amount: '$10,000.00', asset: 'ETH', date: 'Oct 20, 2025', status: 'Rejected' },
-    { id: 'DEP-98231', user: 'Emily Davis', amount: '$2,500.00', asset: 'SOL', date: 'Oct 18, 2025', status: 'Pending' },
-  ]);
+  const [deposits, setDeposits] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  const handleApprove = (id: string) => {
-    const updatedDeposits = deposits.map(d => 
-      d.id === id ? { ...d, status: 'Approved' } : d
-    );
-    setDeposits(updatedDeposits);
+  useEffect(() => {
+    fetchDeposits();
+  }, []);
+
+  const fetchDeposits = async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch('/api/admin/transactions');
+      if (res.ok) {
+        const data = await res.json();
+        setDeposits(data.filter((t: any) => t.type === 'deposit'));
+      } else {
+        const errData = await res.json();
+        setError(errData.error || 'Failed to fetch deposits');
+      }
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleReject = (id: string) => {
-    const updatedDeposits = deposits.map(d => 
-      d.id === id ? { ...d, status: 'Rejected' } : d
-    );
-    setDeposits(updatedDeposits);
+  const handleApprove = async (id: number) => {
+    try {
+      const res = await fetch(`/api/admin/transactions/${id}/approve`, { method: 'POST' });
+      if (res.ok) {
+        const updatedDeposits = deposits.map(d => 
+          d.id === id ? { ...d, status: 'Completed' } : d
+        );
+        setDeposits(updatedDeposits);
+      } else {
+        const errData = await res.json();
+        alert(errData.error || 'Failed to approve deposit');
+      }
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  const handleReject = async (id: number) => {
+    try {
+      const res = await fetch(`/api/admin/transactions/${id}/reject`, { method: 'POST' });
+      if (res.ok) {
+        const updatedDeposits = deposits.map(d => 
+          d.id === id ? { ...d, status: 'Rejected' } : d
+        );
+        setDeposits(updatedDeposits);
+      } else {
+        const errData = await res.json();
+        alert(errData.error || 'Failed to reject deposit');
+      }
+    } catch (err: any) {
+      alert(err.message);
+    }
   };
 
   return (
@@ -34,6 +73,12 @@ export default function Deposits() {
           </button>
         </div>
       </div>
+
+      {error && (
+        <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400">
+          {error}
+        </div>
+      )}
 
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
@@ -53,16 +98,27 @@ export default function Deposits() {
             </tr>
           </thead>
           <tbody className="text-sm divide-y divide-white/5">
-            {deposits.map((deposit) => (
+            {isLoading ? (
+              <tr>
+                <td colSpan={7} className="px-6 py-8 text-center text-slate-400">Loading deposits...</td>
+              </tr>
+            ) : deposits.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="px-6 py-8 text-center text-slate-400">No deposit requests found.</td>
+              </tr>
+            ) : deposits.map((deposit) => (
               <tr key={deposit.id} className="hover:bg-white/5 transition-colors group">
                 <td className="px-6 py-4 font-mono text-slate-300">{deposit.id}</td>
-                <td className="px-6 py-4 font-medium text-white">{deposit.user}</td>
-                <td className="px-6 py-4 font-bold text-emerald-400">{deposit.amount}</td>
+                <td className="px-6 py-4 font-medium text-white">
+                  <div>{deposit.userName}</div>
+                  <div className="text-xs text-slate-500">{deposit.userEmail}</div>
+                </td>
+                <td className="px-6 py-4 font-bold text-emerald-400">${deposit.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                 <td className="px-6 py-4 text-slate-400">{deposit.asset}</td>
-                <td className="px-6 py-4 text-slate-400">{deposit.date}</td>
+                <td className="px-6 py-4 text-slate-400">{new Date(deposit.createdAt).toLocaleDateString()}</td>
                 <td className="px-6 py-4">
                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    deposit.status === 'Approved' ? 'bg-emerald-500/10 text-emerald-400' : 
+                    deposit.status === 'Completed' ? 'bg-emerald-500/10 text-emerald-400' : 
                     deposit.status === 'Pending' ? 'bg-yellow-500/10 text-yellow-400' : 
                     'bg-red-500/10 text-red-400'
                   }`}>

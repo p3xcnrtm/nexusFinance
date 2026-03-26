@@ -1,36 +1,75 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { ShieldCheck, CheckCircle, XCircle, Eye, FileText } from 'lucide-react';
 
 export default function KYCVerification() {
-  const [kycRequests, setKycRequests] = useState([
-    { id: 1, user: 'John Doe', email: 'john@example.com', date: 'Oct 24, 2025', status: 'Pending', documents: ['ID Front', 'ID Back', 'Selfie'] },
-    { id: 2, user: 'Sarah Smith', email: 'sarah@example.com', date: 'Oct 23, 2025', status: 'Approved', documents: ['Passport', 'Selfie'] },
-    { id: 3, user: 'Mike Johnson', email: 'mike@example.com', date: 'Oct 22, 2025', status: 'Rejected', documents: ['ID Front', 'Selfie'] },
-  ]);
-
+  const [kycRequests, setKycRequests] = useState<any[]>([]);
   const [selectedRequest, setSelectedRequest] = useState<any>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    fetchKycRequests();
+  }, []);
+
+  const fetchKycRequests = async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch('/api/admin/kyc');
+      if (res.ok) {
+        const data = await res.json();
+        setKycRequests(data);
+      } else {
+        const errData = await res.json();
+        setError(errData.error || 'Failed to fetch KYC requests');
+      }
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleView = (request: any) => {
     setSelectedRequest(request);
     setIsModalOpen(true);
   };
 
-  const handleApprove = (id: number) => {
-    const updatedRequests = kycRequests.map(r => 
-      r.id === id ? { ...r, status: 'Approved' } : r
-    );
-    setKycRequests(updatedRequests);
-    setIsModalOpen(false);
+  const handleApprove = async (id: number) => {
+    try {
+      const res = await fetch(`/api/admin/kyc/${id}/approve`, { method: 'POST' });
+      if (res.ok) {
+        const updatedRequests = kycRequests.map(r => 
+          r.id === id ? { ...r, status: 'Approved' } : r
+        );
+        setKycRequests(updatedRequests);
+        setIsModalOpen(false);
+      } else {
+        const errData = await res.json();
+        alert(errData.error || 'Failed to approve KYC');
+      }
+    } catch (err: any) {
+      alert(err.message);
+    }
   };
 
-  const handleReject = (id: number) => {
-    const updatedRequests = kycRequests.map(r => 
-      r.id === id ? { ...r, status: 'Rejected' } : r
-    );
-    setKycRequests(updatedRequests);
-    setIsModalOpen(false);
+  const handleReject = async (id: number) => {
+    try {
+      const res = await fetch(`/api/admin/kyc/${id}/reject`, { method: 'POST' });
+      if (res.ok) {
+        const updatedRequests = kycRequests.map(r => 
+          r.id === id ? { ...r, status: 'Rejected' } : r
+        );
+        setKycRequests(updatedRequests);
+        setIsModalOpen(false);
+      } else {
+        const errData = await res.json();
+        alert(errData.error || 'Failed to reject KYC');
+      }
+    } catch (err: any) {
+      alert(err.message);
+    }
   };
 
   return (
@@ -44,6 +83,12 @@ export default function KYCVerification() {
         </div>
       </div>
 
+      {error && (
+        <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400">
+          {error}
+        </div>
+      )}
+
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -53,20 +98,29 @@ export default function KYCVerification() {
           <thead>
             <tr className="bg-nexus-dark/50 text-slate-400 text-xs uppercase tracking-wider border-b border-white/10">
               <th className="px-6 py-4 font-medium">User</th>
-              <th className="px-6 py-4 font-medium">Email</th>
+              <th className="px-6 py-4 font-medium">Document Type</th>
               <th className="px-6 py-4 font-medium">Submission Date</th>
-              <th className="px-6 py-4 font-medium">Documents</th>
               <th className="px-6 py-4 font-medium">Status</th>
               <th className="px-6 py-4 font-medium text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="text-sm divide-y divide-white/5">
-            {kycRequests.map((request) => (
+            {isLoading ? (
+              <tr>
+                <td colSpan={5} className="px-6 py-8 text-center text-slate-400">Loading KYC requests...</td>
+              </tr>
+            ) : kycRequests.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="px-6 py-8 text-center text-slate-400">No KYC requests found.</td>
+              </tr>
+            ) : kycRequests.map((request) => (
               <tr key={request.id} className="hover:bg-white/5 transition-colors group">
-                <td className="px-6 py-4 font-medium text-white">{request.user}</td>
-                <td className="px-6 py-4 text-slate-400">{request.email}</td>
-                <td className="px-6 py-4 text-slate-400">{request.date}</td>
-                <td className="px-6 py-4 text-slate-400">{request.documents.length} Files</td>
+                <td className="px-6 py-4 font-medium text-white">
+                  <div>{request.userName}</div>
+                  <div className="text-xs text-slate-500">{request.userEmail}</div>
+                </td>
+                <td className="px-6 py-4 text-slate-400">{request.documentType}</td>
+                <td className="px-6 py-4 text-slate-400">{new Date(request.createdAt).toLocaleDateString()}</td>
                 <td className="px-6 py-4">
                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                     request.status === 'Approved' ? 'bg-emerald-500/10 text-emerald-400' : 
@@ -122,7 +176,7 @@ export default function KYCVerification() {
             <div className="flex justify-between items-start mb-6">
               <div>
                 <h3 className="text-xl font-bold text-white">KYC Documents</h3>
-                <p className="text-sm text-slate-400">Reviewing submission for <span className="text-white font-bold">{selectedRequest.user}</span></p>
+                <p className="text-sm text-slate-400">Reviewing submission for <span className="text-white font-bold">{selectedRequest.userName}</span></p>
               </div>
               <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-white">
                 <XCircle className="w-6 h-6" />
@@ -130,33 +184,39 @@ export default function KYCVerification() {
             </div>
 
             <div className="grid md:grid-cols-2 gap-6 mb-8">
-              {selectedRequest.documents.map((doc: string, index: number) => (
-                <div key={index} className="space-y-2">
-                  <p className="text-sm font-medium text-slate-300">{doc}</p>
-                  <div className="aspect-video bg-black/50 rounded-lg border border-white/10 flex items-center justify-center relative overflow-hidden group">
-                    <FileText className="w-12 h-12 text-slate-600 group-hover:text-slate-500 transition-colors" />
-                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <button className="px-4 py-2 bg-white text-nexus-dark font-bold rounded-lg text-sm">View Full Size</button>
+              {['frontImage', 'backImage', 'selfieImage'].map((docKey, index) => {
+                const docUrl = selectedRequest[docKey];
+                if (!docUrl) return null;
+                return (
+                  <div key={index} className="space-y-2">
+                    <p className="text-sm font-medium text-slate-300 capitalize">{docKey.replace('Image', ' Image')}</p>
+                    <div className="aspect-video bg-black/50 rounded-lg border border-white/10 flex items-center justify-center relative overflow-hidden group">
+                      <img src={docUrl} alt={docKey} className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <a href={docUrl} target="_blank" rel="noopener noreferrer" className="px-4 py-2 bg-white text-nexus-dark font-bold rounded-lg text-sm">View Full Size</a>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
-            <div className="flex justify-end gap-3 pt-6 border-t border-white/10">
-              <button 
-                onClick={() => handleReject(selectedRequest.id)}
-                className="px-4 py-2 bg-red-500/10 text-red-400 font-bold rounded-lg hover:bg-red-500/20 transition-colors"
-              >
-                Reject Application
-              </button>
-              <button 
-                onClick={() => handleApprove(selectedRequest.id)}
-                className="px-4 py-2 bg-emerald-600 text-white font-bold rounded-lg hover:bg-emerald-700 transition-colors"
-              >
-                Approve Application
-              </button>
-            </div>
+            {selectedRequest.status === 'Pending' && (
+              <div className="flex justify-end gap-3 pt-6 border-t border-white/10">
+                <button 
+                  onClick={() => handleReject(selectedRequest.id)}
+                  className="px-4 py-2 bg-red-500/10 text-red-400 font-bold rounded-lg hover:bg-red-500/20 transition-colors"
+                >
+                  Reject Application
+                </button>
+                <button 
+                  onClick={() => handleApprove(selectedRequest.id)}
+                  className="px-4 py-2 bg-emerald-600 text-white font-bold rounded-lg hover:bg-emerald-700 transition-colors"
+                >
+                  Approve Application
+                </button>
+              </div>
+            )}
           </motion.div>
         </div>
       )}

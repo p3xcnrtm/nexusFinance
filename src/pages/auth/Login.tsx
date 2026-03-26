@@ -2,25 +2,51 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, ArrowRight, AlertCircle } from 'lucide-react';
 import { motion } from 'motion/react';
+import { useAuth } from '../../context/AuthContext';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const { login } = useAuth();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     
-    // Simulate login
-    if (email && password) {
-      // In a real app, you'd validate against a backend
-      localStorage.setItem('isAuthenticated', 'true');
-      localStorage.setItem('userEmail', email);
-      navigate('/dashboard');
-    } else {
+    if (!email || !password) {
       setError('Please enter both email and password.');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Login failed');
+      }
+
+      login(data.user);
+      
+      if (data.user.role === 'admin') {
+        localStorage.setItem('isAdminAuthenticated', 'true');
+        navigate('/admin/dashboard');
+      } else {
+        navigate('/dashboard');
+      }
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -63,6 +89,7 @@ export default function Login() {
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full bg-nexus-dark/50 border border-white/10 rounded-lg pl-10 pr-4 py-3 text-white focus:border-nexus-gold outline-none transition-colors"
                 placeholder="investor@example.com"
+                required
               />
             </div>
           </div>
@@ -80,15 +107,17 @@ export default function Login() {
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full bg-nexus-dark/50 border border-white/10 rounded-lg pl-10 pr-4 py-3 text-white focus:border-nexus-gold outline-none transition-colors"
                 placeholder="••••••••"
+                required
               />
             </div>
           </div>
 
           <button 
             type="submit" 
-            className="w-full py-4 bg-nexus-gold text-nexus-dark font-bold rounded-lg hover:bg-white transition-colors flex items-center justify-center gap-2 mt-6"
+            disabled={isLoading}
+            className="w-full py-4 bg-nexus-gold text-nexus-dark font-bold rounded-lg hover:bg-white transition-colors flex items-center justify-center gap-2 mt-6 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Login to Dashboard <ArrowRight className="w-4 h-4" />
+            {isLoading ? 'Logging in...' : 'Login to Dashboard'} <ArrowRight className="w-4 h-4" />
           </button>
         </form>
 
