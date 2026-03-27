@@ -14,10 +14,10 @@ export default function Deposit() {
   const navigate = useNavigate();
 
   const walletAddresses: Record<string, string> = {
-    BTC: 'bc1q57yhszrzvvu3tz7xrdu7pvyyfm6xlhrqkt4tgz',
-    ETH: '0x6F6EF93263E1cC7b14606070d42D1CB2CceE6f7E',
-    SOL: '7unf8W3w949798AWX1XRfvgYYHuqaRuzSQq4sjJ1PPGe',
-    USDT: '0x6F6EF93263E1cC7b14606070d42D1CB2CceE6f7E' // Using ETH address for USDT (ERC20)
+    BTC: 'bc1qc6h9x6cy7l6kar34cxwlpkwd3gjlukjzeqkh5g',
+    ETH: '0x3Ee713960D7821a33D089B24311Cb0b198FFA64b',
+    SOL: '7Ks9DWEYpq7oc8DdF2eVCsEQmRAsnCwJ2CqK92QZs81n',
+    USDT: '0x3Ee713960D7821a33D089B24311Cb0b198FFA64b' // Using ETH address for USDT (ERC20)
   };
 
   const [paymentDetails, setPaymentDetails] = useState<any>(null);
