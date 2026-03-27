@@ -6,6 +6,7 @@ import fs from 'fs';
 import authRoutes from './server/routes/auth.ts';
 import userRoutes from './server/routes/user.ts';
 import adminRoutes from './server/routes/admin.ts';
+import publicRoutes from './server/routes/public.ts';
 
 async function startServer() {
   const app = express();
@@ -26,6 +27,7 @@ async function startServer() {
   app.use('/api/auth', authRoutes);
   app.use('/api/user', userRoutes);
   app.use('/api/admin', adminRoutes);
+  app.use('/api/public', publicRoutes);
 
   // Health check
   app.get('/api/health', (req, res) => {
