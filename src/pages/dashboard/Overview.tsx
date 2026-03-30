@@ -231,7 +231,7 @@ export default function Overview() {
       >
         <div className="flex justify-between items-center mb-6">
           <h3 className="text-xl font-bold text-white">Recent Transactions</h3>
-          <Link to="/dashboard/transactions" className="text-nexus-gold text-sm hover:underline">View All</Link>
+          <Link to="/dashboard/history" className="text-nexus-gold text-sm hover:underline">View All</Link>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">

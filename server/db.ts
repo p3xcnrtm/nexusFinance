@@ -49,6 +49,8 @@ db.exec(`
     status TEXT DEFAULT 'Active',
     kycStatus TEXT DEFAULT 'Unverified',
     referralCode TEXT UNIQUE,
+    isVerified INTEGER DEFAULT 0,
+    otp TEXT,
     createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
@@ -128,16 +130,26 @@ try {
   db.exec("ALTER TABLE users ADD COLUMN referrerId INTEGER REFERENCES users(id);");
 } catch (e) {}
 
+try {
+  db.exec("ALTER TABLE users ADD COLUMN isVerified INTEGER DEFAULT 0;");
+} catch (e) {}
+
+try {
+  db.exec("ALTER TABLE users ADD COLUMN otp TEXT;");
+} catch (e) {}
+
 // Seed default admin user if it doesn't exist
 const adminExists = db.prepare("SELECT * FROM users WHERE email = 'admin@nexusedge.finance'").get();
 
 if (!adminExists) {
   const hash = bcrypt.hashSync('admin123', 10);
   db.prepare(`
-    INSERT INTO users (fullName, email, passwordHash, role, status, kycStatus)
-    VALUES ('System Admin', 'admin@nexusedge.finance', ?, 'admin', 'Active', 'Verified')
+    INSERT INTO users (fullName, email, passwordHash, role, status, kycStatus, isVerified)
+    VALUES ('System Admin', 'admin@nexusedge.finance', ?, 'admin', 'Active', 'Verified', 1)
   `).run(hash);
   console.log('Default admin created: admin@nexusedge.finance / admin123');
+} else {
+  db.prepare("UPDATE users SET isVerified = 1 WHERE email = 'admin@nexusedge.finance'").run();
 }
 
 export default db;

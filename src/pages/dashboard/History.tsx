@@ -3,8 +3,13 @@ import { motion } from 'motion/react';
 import { ArrowUpRight, ArrowDownLeft, Filter } from 'lucide-react';
 
 export default function History() {
-  const [transactions, setTransactions] = useState([]);
+  const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Pagination and Filtering state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [filterType, setFilterType] = useState('All Transactions');
+  const itemsPerPage = 10;
 
   useEffect(() => {
     const fetchTransactions = async () => {
@@ -28,6 +33,34 @@ export default function History() {
     return <div className="text-white">Loading transactions...</div>;
   }
 
+  // Filter transactions
+  const filteredTransactions = transactions.filter(tx => {
+    if (filterType === 'All Transactions') return true;
+    if (filterType === 'Deposits') return tx.type === 'deposit';
+    if (filterType === 'Withdrawals') return tx.type === 'withdrawal';
+    if (filterType === 'Investments') return tx.type === 'investment';
+    if (filterType === 'Profits') return tx.type === 'profit';
+    return true;
+  });
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const currentTransactions = filteredTransactions.slice(startIndex, startIndex + itemsPerPage);
+
+  const handlePrevPage = () => {
+    if (currentPage > 1) setCurrentPage(prev => prev - 1);
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) setCurrentPage(prev => prev + 1);
+  };
+
+  const handleFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setFilterType(e.target.value);
+    setCurrentPage(1); // Reset to first page on filter change
+  };
+
   return (
     <div className="space-y-8">
       <div className="flex justify-between items-center mb-6">
@@ -36,7 +69,11 @@ export default function History() {
           <button className="p-2 border border-white/10 rounded-lg hover:bg-white/5 transition-colors text-slate-400 hover:text-white">
             <Filter className="w-5 h-5" />
           </button>
-          <select className="bg-nexus-dark border border-white/10 rounded-lg px-3 py-2 text-sm text-slate-300 outline-none">
+          <select 
+            value={filterType}
+            onChange={handleFilterChange}
+            className="bg-nexus-dark border border-white/10 rounded-lg px-3 py-2 text-sm text-slate-300 outline-none"
+          >
             <option>All Transactions</option>
             <option>Deposits</option>
             <option>Withdrawals</option>
@@ -64,8 +101,8 @@ export default function History() {
               </tr>
             </thead>
             <tbody className="text-sm divide-y divide-white/5">
-              {transactions.length > 0 ? (
-                transactions.map((tx: any, i: number) => (
+              {currentTransactions.length > 0 ? (
+                currentTransactions.map((tx: any, i: number) => (
                   <tr key={i} className="hover:bg-white/5 transition-colors group">
                     <td className="px-6 py-4 text-slate-300 font-mono group-hover:text-nexus-gold transition-colors">{tx.id}</td>
                     <td className="px-6 py-4">
@@ -102,12 +139,26 @@ export default function History() {
         </div>
         
         {/* Pagination */}
-        {transactions.length > 0 && (
+        {filteredTransactions.length > 0 && (
           <div className="px-6 py-4 border-t border-white/5 flex items-center justify-between">
-            <p className="text-xs text-slate-500">Showing {transactions.length} entries</p>
+            <p className="text-xs text-slate-500">
+              Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, filteredTransactions.length)} of {filteredTransactions.length} entries
+            </p>
             <div className="flex gap-2">
-              <button className="px-3 py-1 border border-white/10 rounded-md text-xs text-slate-400 hover:text-white hover:bg-white/5 transition-colors disabled:opacity-50" disabled>Previous</button>
-              <button className="px-3 py-1 border border-white/10 rounded-md text-xs text-slate-400 hover:text-white hover:bg-white/5 transition-colors disabled:opacity-50" disabled>Next</button>
+              <button 
+                onClick={handlePrevPage}
+                disabled={currentPage === 1}
+                className="px-3 py-1 border border-white/10 rounded-md text-xs text-slate-400 hover:text-white hover:bg-white/5 transition-colors disabled:opacity-50"
+              >
+                Previous
+              </button>
+              <button 
+                onClick={handleNextPage}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1 border border-white/10 rounded-md text-xs text-slate-400 hover:text-white hover:bg-white/5 transition-colors disabled:opacity-50"
+              >
+                Next
+              </button>
             </div>
           </div>
         )}

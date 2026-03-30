@@ -66,7 +66,7 @@ export default function Withdraw() {
       setAddress('');
       setBalance(prev => prev - Number(amount));
       setTimeout(() => {
-        navigate('/dashboard/transactions');
+        navigate('/dashboard/history');
       }, 3000);
     } catch (err: any) {
       setError(err.message);

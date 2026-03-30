@@ -14,10 +14,10 @@ export default function Deposit() {
   const navigate = useNavigate();
 
   const walletAddresses: Record<string, string> = {
-    BTC: 'bc1q57yhszrzvvu3tz7xrdu7pvyyfm6xlhrqkt4tgz',
-    ETH: '0x6F6EF93263E1cC7b14606070d42D1CB2CceE6f7E',
-    SOL: '7unf8W3w949798AWX1XRfvgYYHuqaRuzSQq4sjJ1PPGe',
-    USDT: '0x6F6EF93263E1cC7b14606070d42D1CB2CceE6f7E' // Using ETH address for USDT (ERC20)
+    BTC: 'bc1qc6h9x6cy7l6kar34cxwlpkwd3gjlukjzeqkh5g',
+    ETH: '0x3Ee713960D7821a33D089B24311Cb0b198FFA64b',
+    SOL: '7Ks9DWEYpq7oc8DdF2eVCsEQmRAsnCwJ2CqK92QZs81n',
+    USDT: '0x3Ee713960D7821a33D089B24311Cb0b198FFA64b' // Using ETH address for USDT (ERC20)
   };
 
   const [paymentDetails, setPaymentDetails] = useState<any>(null);
@@ -53,15 +53,20 @@ export default function Deposit() {
 
     setIsLoading(true);
     try {
-      const price = await getCryptoPrice(selectedAsset);
-      const cryptoAmount = (Number(amount) / price).toFixed(8);
+      let cryptoAmount = amount;
+      let asset = selectedMethod === 'bank' ? 'USD' : selectedAsset;
+
+      if (selectedMethod === 'crypto') {
+        const price = await getCryptoPrice(selectedAsset);
+        cryptoAmount = (Number(amount) / price).toFixed(8);
+      }
 
       const res = await fetch('/api/user/deposit', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ amount: Number(amount), asset: selectedAsset })
+        body: JSON.stringify({ amount: Number(amount), asset })
       });
 
       const data = await res.json();
@@ -72,11 +77,26 @@ export default function Deposit() {
 
       setSuccess(`Deposit request submitted successfully! Transaction ID: ${data.txId}`);
       
-      setPaymentDetails({
-        address: walletAddresses[selectedAsset] || walletAddresses['BTC'],
-        amount: cryptoAmount,
-        currency: selectedAsset
-      });
+      if (selectedMethod === 'crypto') {
+        setPaymentDetails({
+          type: 'crypto',
+          address: walletAddresses[selectedAsset] || walletAddresses['BTC'],
+          amount: cryptoAmount,
+          currency: selectedAsset
+        });
+      } else {
+        setPaymentDetails({
+          type: 'bank',
+          amount: amount,
+          currency: 'USD',
+          reference: data.txId,
+          bankName: 'NexusEdge Global Bank',
+          accountName: 'NexusEdge Holdings LLC',
+          accountNumber: '1234567890',
+          routingNumber: '098765432',
+          swiftCode: 'NEXUSUS33'
+        });
+      }
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -137,7 +157,7 @@ export default function Deposit() {
             </button>
           </div>
 
-          {selectedMethod === 'crypto' && (
+          {selectedMethod === 'crypto' ? (
             <div className="space-y-4">
               <div>
                 <label className="block text-xs uppercase tracking-wider text-blue-300 mb-2">Select Asset</label>
@@ -171,6 +191,25 @@ export default function Deposit() {
                 </p>
               </div>
             </div>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs uppercase tracking-wider text-blue-300 mb-2">Amount (USD)</label>
+                <input 
+                  type="number" 
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  className="w-full bg-nexus-dark border border-white/10 rounded-lg p-3 text-white focus:border-nexus-gold outline-none transition-colors"
+                  placeholder="Enter amount"
+                />
+              </div>
+              <div className="p-4 bg-nexus-blue/10 border border-nexus-blue/20 rounded-lg flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-nexus-blue shrink-0 mt-0.5" />
+                <p className="text-sm text-blue-200">
+                  Bank transfers typically take 1-3 business days to process. Please include your reference number in the transfer description.
+                </p>
+              </div>
+            </div>
           )}
         </motion.div>
 
@@ -180,8 +219,8 @@ export default function Deposit() {
           animate={{ opacity: 1, x: 0 }}
           className="bg-nexus-navy/50 backdrop-blur-md border border-white/5 p-8 rounded-xl flex flex-col justify-between"
         >
-          {selectedMethod === 'crypto' ? (
-            paymentDetails ? (
+          {paymentDetails ? (
+            paymentDetails.type === 'crypto' ? (
               <div className="space-y-6">
                 <h3 className="text-xl font-bold text-white mb-6">Complete Your Payment</h3>
                 
@@ -226,30 +265,82 @@ export default function Deposit() {
                 </button>
               </div>
             ) : (
-              <>
-                <div className="text-center py-12">
-                  <div className="w-16 h-16 bg-nexus-blue/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <ArrowRight className="w-8 h-8 text-nexus-blue" />
-                  </div>
-                  <h3 className="text-xl font-bold text-white mb-2">Ready to Deposit</h3>
-                  <p className="text-slate-400">Enter the amount and select your preferred cryptocurrency to generate a payment address.</p>
+              <div className="space-y-6">
+                <h3 className="text-xl font-bold text-white mb-6">Bank Transfer Details</h3>
+                
+                <div className="p-4 bg-nexus-blue/10 border border-nexus-blue/20 rounded-lg">
+                  <p className="text-sm text-blue-200 mb-1">Transfer exactly:</p>
+                  <p className="text-2xl font-bold text-white">${paymentDetails.amount} {paymentDetails.currency}</p>
                 </div>
 
-                <div className="mt-8 pt-8 border-t border-white/10">
-                  <button 
-                    onClick={handleDeposit}
-                    disabled={isLoading || !amount}
-                    className="w-full py-4 bg-nexus-gold text-nexus-dark font-bold rounded-lg hover:bg-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2"
-                  >
-                    {isLoading ? 'Processing...' : 'Generate Payment Address'} <ArrowRight className="w-4 h-4" />
-                  </button>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs uppercase tracking-wider text-blue-300 mb-1">Bank Name</label>
+                    <p className="text-white font-medium">{paymentDetails.bankName}</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs uppercase tracking-wider text-blue-300 mb-1">Account Name</label>
+                    <p className="text-white font-medium">{paymentDetails.accountName}</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs uppercase tracking-wider text-blue-300 mb-1">Account Number</label>
+                    <div className="flex items-center justify-between bg-nexus-dark border border-white/10 rounded-lg p-3">
+                      <p className="text-white font-mono">{paymentDetails.accountNumber}</p>
+                      <button onClick={() => handleCopy(paymentDetails.accountNumber)} className="text-nexus-gold hover:text-white">
+                        <Copy className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs uppercase tracking-wider text-blue-300 mb-1">Routing Number</label>
+                      <p className="text-white font-mono">{paymentDetails.routingNumber}</p>
+                    </div>
+                    <div>
+                      <label className="block text-xs uppercase tracking-wider text-blue-300 mb-1">SWIFT Code</label>
+                      <p className="text-white font-mono">{paymentDetails.swiftCode}</p>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs uppercase tracking-wider text-nexus-gold mb-1">Reference Number (Required)</label>
+                    <div className="flex items-center justify-between bg-nexus-gold/10 border border-nexus-gold/30 rounded-lg p-3">
+                      <p className="text-nexus-gold font-mono font-bold">{paymentDetails.reference}</p>
+                      <button onClick={() => handleCopy(paymentDetails.reference)} className="text-nexus-gold hover:text-white">
+                        <Copy className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-1">You must include this reference number in your transfer description.</p>
+                  </div>
                 </div>
-              </>
+
+                <button 
+                  onClick={() => navigate('/dashboard/history')}
+                  className="w-full py-4 bg-nexus-gold text-nexus-dark font-bold rounded-lg hover:bg-white transition-colors flex justify-center items-center gap-2 mt-6"
+                >
+                  I Have Made The Transfer <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
             )
           ) : (
-            <div className="text-center py-12">
-              <p className="text-slate-400">Bank transfer is currently disabled. Please use Cryptocurrency.</p>
-            </div>
+            <>
+              <div className="text-center py-12">
+                <div className="w-16 h-16 bg-nexus-blue/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <ArrowRight className="w-8 h-8 text-nexus-blue" />
+                </div>
+                <h3 className="text-xl font-bold text-white mb-2">Ready to Deposit</h3>
+                <p className="text-slate-400">Enter the amount and select your preferred method to generate payment details.</p>
+              </div>
+
+              <div className="mt-8 pt-8 border-t border-white/10">
+                <button 
+                  onClick={handleDeposit}
+                  disabled={isLoading || !amount}
+                  className="w-full py-4 bg-nexus-gold text-nexus-dark font-bold rounded-lg hover:bg-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2"
+                >
+                  {isLoading ? 'Processing...' : 'Generate Payment Details'} <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+            </>
           )}
         </motion.div>
       </div>

@@ -10,7 +10,7 @@ import publicRoutes from './server/routes/public.ts';
 
 async function startServer() {
   const app = express();
-  const PORT = process.env.PORT || 3000;
+  const PORT = Number(process.env.PORT) || 3000;
 
   // Middleware
   app.use(express.json());

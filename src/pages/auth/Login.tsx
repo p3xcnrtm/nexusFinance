@@ -9,6 +9,8 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showOtp, setShowOtp] = useState(false);
+  const [otp, setOtp] = useState('');
   const navigate = useNavigate();
   const { login } = useAuth();
 
@@ -32,7 +34,44 @@ export default function Login() {
       const data = await res.json();
 
       if (!res.ok) {
+        if (data.requireOtp) {
+          setShowOtp(true);
+          return;
+        }
         throw new Error(data.error || 'Login failed');
+      }
+
+      login(data.user);
+      
+      if (data.user.role === 'admin') {
+        localStorage.setItem('isAdminAuthenticated', 'true');
+        navigate('/admin/dashboard');
+      } else {
+        navigate('/dashboard');
+      }
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setIsLoading(true);
+
+    try {
+      const res = await fetch('/api/auth/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, otp })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'OTP verification failed');
       }
 
       login(data.user);
@@ -67,8 +106,8 @@ export default function Login() {
             <div className="w-8 h-8 bg-nexus-gold rounded-md flex items-center justify-center text-nexus-dark font-bold">N</div>
             <span className="text-xl font-display font-bold text-white group-hover:text-nexus-gold transition-colors">Nexus<span className="text-nexus-gold">Edge</span></span>
           </Link>
-          <h2 className="text-2xl font-bold text-white mb-2">Welcome Back</h2>
-          <p className="text-blue-200 text-sm">Access your institutional-grade portfolio.</p>
+          <h2 className="text-2xl font-bold text-white mb-2">{showOtp ? 'Verify Your Account' : 'Welcome Back'}</h2>
+          <p className="text-blue-200 text-sm">{showOtp ? 'Enter the OTP sent to your email.' : 'Access your institutional-grade portfolio.'}</p>
         </div>
 
         {error && (
@@ -78,48 +117,74 @@ export default function Login() {
           </div>
         )}
 
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div>
-            <label className="block text-xs uppercase tracking-wider text-blue-300 mb-2">Email Address</label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
-              <input 
-                type="email" 
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-nexus-dark/50 border border-white/10 rounded-lg pl-10 pr-4 py-3 text-white focus:border-nexus-gold outline-none transition-colors"
-                placeholder="investor@example.com"
-                required
-              />
+        {showOtp ? (
+          <form onSubmit={handleVerifyOtp} className="space-y-4">
+            <div>
+              <label className="block text-xs uppercase tracking-wider text-blue-300 mb-2">One-Time Password (OTP)</label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                <input 
+                  type="text" 
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value)}
+                  className="w-full bg-nexus-dark/50 border border-white/10 rounded-lg pl-10 pr-4 py-3 text-white focus:border-nexus-gold outline-none transition-colors"
+                  placeholder="123456"
+                  required
+                />
+              </div>
             </div>
-          </div>
-          
-          <div>
-            <div className="flex justify-between items-center mb-2">
-              <label className="block text-xs uppercase tracking-wider text-blue-300">Password</label>
-              <a href="#" className="text-xs text-nexus-gold hover:underline">Forgot Password?</a>
+            <button 
+              type="submit" 
+              disabled={isLoading}
+              className="w-full py-4 bg-nexus-gold text-nexus-dark font-bold rounded-lg hover:bg-white transition-colors flex items-center justify-center gap-2 mt-6 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isLoading ? 'Verifying...' : 'Verify Account'} <ArrowRight className="w-4 h-4" />
+            </button>
+          </form>
+        ) : (
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <label className="block text-xs uppercase tracking-wider text-blue-300 mb-2">Email Address</label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                <input 
+                  type="email" 
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full bg-nexus-dark/50 border border-white/10 rounded-lg pl-10 pr-4 py-3 text-white focus:border-nexus-gold outline-none transition-colors"
+                  placeholder="investor@example.com"
+                  required
+                />
+              </div>
             </div>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
-              <input 
-                type="password" 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-nexus-dark/50 border border-white/10 rounded-lg pl-10 pr-4 py-3 text-white focus:border-nexus-gold outline-none transition-colors"
-                placeholder="••••••••"
-                required
-              />
+            
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <label className="block text-xs uppercase tracking-wider text-blue-300">Password</label>
+                <a href="#" className="text-xs text-nexus-gold hover:underline">Forgot Password?</a>
+              </div>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                <input 
+                  type="password" 
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full bg-nexus-dark/50 border border-white/10 rounded-lg pl-10 pr-4 py-3 text-white focus:border-nexus-gold outline-none transition-colors"
+                  placeholder="••••••••"
+                  required
+                />
+              </div>
             </div>
-          </div>
 
-          <button 
-            type="submit" 
-            disabled={isLoading}
-            className="w-full py-4 bg-nexus-gold text-nexus-dark font-bold rounded-lg hover:bg-white transition-colors flex items-center justify-center gap-2 mt-6 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isLoading ? 'Logging in...' : 'Login to Dashboard'} <ArrowRight className="w-4 h-4" />
-          </button>
-        </form>
+            <button 
+              type="submit" 
+              disabled={isLoading}
+              className="w-full py-4 bg-nexus-gold text-nexus-dark font-bold rounded-lg hover:bg-white transition-colors flex items-center justify-center gap-2 mt-6 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isLoading ? 'Logging in...' : 'Login to Dashboard'} <ArrowRight className="w-4 h-4" />
+            </button>
+          </form>
+        )}
 
         <div className="mt-8 text-center text-sm text-blue-200">
           Don't have an account? <Link to="/register" className="text-nexus-gold font-bold hover:underline">Create Investor Account</Link>
